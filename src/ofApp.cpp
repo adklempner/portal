@@ -69,6 +69,23 @@ void ofApp::setup(){
     clock.setup();
 
     ball.setup( translateX, translateY, sizeX, sizeY, totalX, totalY );
+    
+    // Pixel Painter
+    defaultPixelColor = ofColor::white;
+    gridColors.resize(totalX / pixelSize.x);
+    for(int i = 0 ; i < gridColors.size(); i++)
+    {
+//        //Grow Columns by n
+//        gridColors[i].resize(totalY / pixelSize.y);
+        for(int j = 0; j < totalY / pixelSize.y; j++) {
+            gridColors[i].push_back(defaultPixelColor);
+        }
+    }
+    
+    Player *firstPlayer = new Player();
+    ofPoint pos = ofPoint(0, 0);
+    firstPlayer->initialize(playerSize, pos, ofColor::red);
+    players.push_back(firstPlayer);
 
 }
 
@@ -82,6 +99,19 @@ void ofApp::update(){
             if( m.getNumArgs() == 3) {
                 bgColor = ofColor(m.getArgAsInt(0), m.getArgAsInt(1), m.getArgAsInt(2) );
             }
+        }
+        
+        if(m.getAddress() == PLAYER_MOVE_ADDRESS) {
+            if(m.getNumArgs() == 3) {
+                int playerId = m.getArgAsInt(0);
+                players[playerId]->updatePosition(m.getArgAsFloat(1), m.getArgAsFloat(2));
+            }
+        }
+        
+        if(m.getAddress() == PLAYER_DRAW_ADDRESS) {
+            int playerId = m.getArgAsInt(0);
+            ofPoint playerPos = players[playerId]->position;
+            gridColors[playerPos.x / playerSize.x][playerPos.y / playerSize.y] = players[playerId]->playerColor;
         }
     }
 
@@ -111,6 +141,23 @@ void ofApp::draw(){
     ofPopMatrix();
 
     clock.draw();
+    
+    // Layer 0 - grid
+    for(unsigned int i = 0; i < gridColors.size(); i++) {
+        for(unsigned int j = 0; j < gridColors[i].size(); j++) {
+            ofPushStyle();
+//            ofPushMatrix();
+            ofSetColor(gridColors[i][j]);
+            ofDrawRectangle(pixelSize.x * i, pixelSize.y * j, pixelSize.x, pixelSize.y);
+//            ofPopMatrix();
+            ofPopStyle();
+        }
+    }
+    
+    // Layer 1 - player cursors
+    for (unsigned int i = 0; i < players.size(); ++i) {
+        players[i]->draw();
+    }
 
 
 }
@@ -118,6 +165,24 @@ void ofApp::draw(){
 void ofApp::keyPressed(int key){
 
     switch ( key ) {
+        case 'w':
+            players[0]->updatePosition(0, -playerSize.y);
+            break;
+        case 's':
+            players[0]->updatePosition(0, playerSize.y);
+            break;
+        case 'd':
+            players[0]->updatePosition(playerSize.x, 0);
+            break;
+        case 'a':
+            players[0]->updatePosition(-playerSize.x, 0);
+            break;
+        case OF_KEY_SPACE:
+//            ofPoint playerPos = players[0]->position;
+            ofLog() << "Player X: " << players[0]->position.x << " Player Y: " << players[0]->position.y;
+            ofLog() << "Grid index X: " << (players[0]->position.x / playerSize.x) << " Y: " << (players[0]->position.y / playerSize.y);
+            gridColors[players[0]->position.x / playerSize.x][players[0]->position.y / playerSize.y] = ofColor::red;
+            break;
         case 'f':
         case 'F':
             ofToggleFullscreen();

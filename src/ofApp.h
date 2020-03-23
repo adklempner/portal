@@ -6,12 +6,19 @@
 #include "ofxOsc.h"
 
 #define OSC_PORT 7777
+
 #define BG_COLOR_ADDRESS "/color"
+#define PLAYER_MOVE_ADDRESS "/player"
+#define PLAYER_DRAW_ADDRESS "/draw"
+
 #define OF_KEY_SPACE 32
 
 #include "Clock.h"
 
 #include "Ball.h"
+
+// Pixel Painter
+#include "Player.h"
 
 class ofApp : public ofBaseApp{
 
@@ -45,5 +52,13 @@ class ofApp : public ofBaseApp{
         Clock clock;
 
         Ball ball;
+    
+        // Pixel Painter
+        vector<vector<ofColor>> gridColors;
+        vector<Player*> players;
+        ofPoint playerSize = ofPoint(50, 50);
+        ofPoint pixelSize = ofPoint(50, 50);
+        ofColor defaultPixelColor;
+        
 
 };
