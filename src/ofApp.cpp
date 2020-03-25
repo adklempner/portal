@@ -2,72 +2,72 @@
 #include "ofApp.h"
 
 void ofApp::setup(){
-
+    
     ofSetFrameRate( 60 );
     ofSetWindowTitle( "Mars Portal" );
     ofSetVerticalSync( true );
     ofEnableAntiAliasing();
-
+    
     ofSetLogLevel( OF_LOG_VERBOSE );
-
-/*
-#if OF_VERSION_MINOR >= 11
-    if ( ofGetScreenWidth() >= 2560 ) {
-        ofxGuiEnableHiResDisplay();
-    }
-#endif
-*/
-
+    
+    /*
+     #if OF_VERSION_MINOR >= 11
+     if ( ofGetScreenWidth() >= 2560 ) {
+     ofxGuiEnableHiResDisplay();
+     }
+     #endif
+     */
+    
     osc.setup(OSC_PORT);
     
     if( (ofGetEnv("PORTAL").length() != 0) ){
-
+        
         translateX = ofToInt( ofGetEnv("TRANSLATE_X") );
         translateY = ofToInt( ofGetEnv("TRANSLATE_Y") );
-
+        
         sizeX = ofToInt( ofGetEnv("SIZE_X") );
         sizeY = ofToInt( ofGetEnv("SIZE_Y") );
-
+        
         totalX = ofToInt( ofGetEnv("TOTAL_X") );
         totalY = ofToInt( ofGetEnv("TOTAL_Y") );
-
+        
         shiftX = ofToInt( ofGetEnv("SHIFT_X") );
         borderX = ofToInt( ofGetEnv("BORDER_X") );
         translateX += shiftX + borderX;
-
+        
         portalId = ofGetEnv("PORTAL_ID");
         mapId = ofGetEnv("MAP_ID");
-
+        
         ofLogNotice() << "My location, x: " << translateX << ", y: " << translateY;
-
+        
         ofSetWindowShape( sizeX, sizeY );
         ofSetWindowPosition( shiftX, 0 );
-
+        
     } else {
-
+        
         translateX = 0;
         translateY = 0;
-
+        
         sizeX = ofGetWindowWidth();
         sizeY = ofGetWindowHeight();
-
+        
         totalX = ofGetWindowWidth();
         totalY = ofGetWindowHeight();
-
+        
         shiftX = 0;
         borderX = 0;
-
+        
         portalId = "n/a";
         mapId = "n/a";
-
+        
         ofLogNotice() << "No portal info received from env";
     }
-
+    
     bgColor = ofColor::black;
     ofSetBackgroundColor(bgColor);
- 
+    
     clock.setup();
-
+    
     ball.setup( translateX, translateY, sizeX, sizeY, totalX, totalY );
     
     // Pixel Painter
@@ -75,48 +75,60 @@ void ofApp::setup(){
     gridColors.resize(totalX / pixelSize.x);
     for(int i = 0 ; i < gridColors.size(); i++)
     {
-//        //Grow Columns by n
-//        gridColors[i].resize(totalY / pixelSize.y);
         for(int j = 0; j < totalY / pixelSize.y; j++) {
             gridColors[i].push_back(defaultPixelColor);
         }
     }
     
-    Player *firstPlayer = new Player();
-    ofPoint pos = ofPoint(0, 0);
-    firstPlayer->initialize(playerSize, pos, ofColor::red);
-    players.push_back(firstPlayer);
-
 }
 
 void ofApp::update(){
     
     while (osc.hasWaitingMessages()) {
-      ofxOscMessage m;
-      osc.getNextMessage(m);
+        ofxOscMessage m;
+        osc.getNextMessage(m);
         
-        if(m.getAddress() == BG_COLOR_ADDRESS) {
-            if( m.getNumArgs() == 3) {
-                bgColor = ofColor(m.getArgAsInt(0), m.getArgAsInt(1), m.getArgAsInt(2) );
+        if(m.getAddress() == PLAYER_COLOR_ADDRESS) {
+            if( m.getNumArgs() == 5) {
+                players[playerUuidToIndex[m.getArgAsString(0)]]->setColor(
+                                                                                  m.getArgAsFloat(1), m.getArgAsFloat(2), m.getArgAsFloat(3) );
+            }
+        }
+        
+        if(m.getAddress() == PLAYER_JOIN_ADDRESS) {
+            if(m.getNumArgs() == 1) {
+                string playerId = m.getArgAsString(0);
+                if(playerUuidToIndex.count(playerId) == 0) {
+                    // Player with this uuid does not exist
+                    int playerIndex = getNextPlayerIndex();
+                    playerUuidToIndex[playerId] = playerIndex;
+                    // Create a new player object
+                    Player *newPlayer = new Player();
+                    newPlayer->initialize(playerSize, getRandomPosition(), getNextColor());
+                    // Add new player to vector
+                    players.resize(playerIndex + 1);
+                    players[playerIndex] = newPlayer;
+                }
             }
         }
         
         if(m.getAddress() == PLAYER_MOVE_ADDRESS) {
             if(m.getNumArgs() == 3) {
-                int playerId = m.getArgAsInt(0);
-                players[playerId]->updatePosition(m.getArgAsFloat(1), m.getArgAsFloat(2));
+                string playerId = m.getArgAsString(0);
+                players[playerUuidToIndex[playerId]]->updatePosition(m.getArgAsFloat(1), m.getArgAsFloat(2));
             }
         }
         
         if(m.getAddress() == PLAYER_DRAW_ADDRESS) {
-            int playerId = m.getArgAsInt(0);
-            ofPoint playerPos = players[playerId]->position;
-            gridColors[playerPos.x / playerSize.x][playerPos.y / playerSize.y] = players[playerId]->playerColor;
+            string playerId = m.getArgAsString(0);
+            Player *player = players[playerUuidToIndex[playerId]];
+            ofPoint playerPos = players[playerUuidToIndex[playerId]]->position;
+            gridColors[playerPos.x / playerSize.x][playerPos.y / playerSize.y] = player->playerColor;
         }
     }
-
+    
     clock.update();
-
+    
     ball.update();
 }
 
@@ -124,46 +136,47 @@ void ofApp::update(){
 void ofApp::draw(){
     ofSetBackgroundColor( bgColor );
     ofSetColor( bgColor.getInverted() );
-        
-
+    
+    
     ofSetColor( ofColor::pink );
     ofSetCircleResolution( 64 );
-
+    
     // general info
     ofDrawBitmapString( "translate x, y: " + ofToString(translateX) + ", " + ofToString(translateY), 10, 10 );
     ofDrawBitmapString( "screen width, height: " + ofToString(ofGetWindowWidth()) + ", " + ofToString(ofGetWindowHeight()), 10, 30 );
     ofDrawBitmapString( "total width, total height: " + ofToString(totalX) + ", " + ofToString(totalY), 10, 50 );
     ofDrawBitmapString( "portalId (mapId): " + portalId + " (" + mapId + ")", 10, 70 );
-
+    
     ofPushMatrix();
-        ofTranslate( -translateX, -translateY );
-            ball.draw();
+    ofTranslate( -translateX, -translateY );
+    ball.draw();
     ofPopMatrix();
-
+    
     clock.draw();
     
     // Layer 0 - grid
     for(unsigned int i = 0; i < gridColors.size(); i++) {
         for(unsigned int j = 0; j < gridColors[i].size(); j++) {
             ofPushStyle();
-//            ofPushMatrix();
+            //            ofPushMatrix();
             ofSetColor(gridColors[i][j]);
             ofDrawRectangle(pixelSize.x * i, pixelSize.y * j, pixelSize.x, pixelSize.y);
-//            ofPopMatrix();
+            //            ofPopMatrix();
             ofPopStyle();
         }
     }
     
     // Layer 1 - player cursors
-    for (unsigned int i = 0; i < players.size(); ++i) {
+    // TODO: replace magic 1
+    for (unsigned int i = 1; i < players.size(); ++i) {
         players[i]->draw();
     }
-
-
+    
+    
 }
 
 void ofApp::keyPressed(int key){
-
+    
     switch ( key ) {
         case 'w':
             players[0]->updatePosition(0, -playerSize.y);
@@ -178,7 +191,7 @@ void ofApp::keyPressed(int key){
             players[0]->updatePosition(-playerSize.x, 0);
             break;
         case OF_KEY_SPACE:
-//            ofPoint playerPos = players[0]->position;
+            //            ofPoint playerPos = players[0]->position;
             ofLog() << "Player X: " << players[0]->position.x << " Player Y: " << players[0]->position.y;
             ofLog() << "Grid index X: " << (players[0]->position.x / playerSize.x) << " Y: " << (players[0]->position.y / playerSize.y);
             gridColors[players[0]->position.x / playerSize.x][players[0]->position.y / playerSize.y] = ofColor::red;
@@ -203,40 +216,58 @@ void ofApp::keyPressed(int key){
 }
 
 void ofApp::keyReleased(int key){
-
+    
 }
 
 void ofApp::mouseMoved(int x, int y ){
-
+    
 }
 
 void ofApp::mouseDragged(int x, int y, int button){
-
+    
 }
 
 void ofApp::mousePressed(int x, int y, int button){
-
+    
 }
 
 void ofApp::mouseReleased(int x, int y, int button){
-
+    
 }
 
 void ofApp::mouseEntered(int x, int y){
-
+    
 }
 
 void ofApp::mouseExited(int x, int y){
-
+    
 }
 
 void ofApp::windowResized(int w, int h){
-
+    
 }
 
 void ofApp::gotMessage(ofMessage msg){
-
+    
 }
 
 void ofApp::dragEvent(ofDragInfo dragInfo){ 
+}
+
+int ofApp::getNextPlayerIndex() {
+    nextPlayerIndex++;
+    return nextPlayerIndex;
+}
+
+ofPoint ofApp::getRandomPosition() {
+    // TODO: randomize
+    return ofPoint(0, 0);
+}
+
+ofColor ofApp::getNextColor() {
+    // TODO: randomize
+    ofColor color = ofColor::red;
+    //    ofColor::fromHex()
+    //    color.setBrightness(<#float brightness#>)
+    return ofColor::red;
 }

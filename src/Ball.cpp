@@ -31,7 +31,7 @@ void Ball::setup( int _translateX, int _translateY, int _sizeX, int _sizeY, int 
         maxDistance = max( maxDistance, screenCenter.distance(corners[j]) );
     }
 
-    sound.load( "e.wav");
+    sound.load("");
     sound.setVolume( 0.0 );
     sound.setLoop( true );
     sound.setSpeed( 0.6 );

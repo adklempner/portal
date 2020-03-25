@@ -7,7 +7,9 @@
 
 #define OSC_PORT 7777
 
-#define BG_COLOR_ADDRESS "/color"
+#define PLAYER_COLOR_ADDRESS "/color"
+
+#define PLAYER_JOIN_ADDRESS "/player_join"
 #define PLAYER_MOVE_ADDRESS "/player"
 #define PLAYER_DRAW_ADDRESS "/draw"
 
@@ -56,9 +58,15 @@ class ofApp : public ofBaseApp{
         // Pixel Painter
         vector<vector<ofColor>> gridColors;
         vector<Player*> players;
+        unordered_map<string, int> playerUuidToIndex;
+        unsigned int nextPlayerIndex = 0;
         ofPoint playerSize = ofPoint(50, 50);
         ofPoint pixelSize = ofPoint(50, 50);
         ofColor defaultPixelColor;
+    
+        int getNextPlayerIndex();
+        ofPoint getRandomPosition();
+        ofColor getNextColor();
         
 
 };

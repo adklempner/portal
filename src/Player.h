@@ -12,8 +12,11 @@ public:
     virtual void updatePosition(float x, float y);
     virtual void reinitialize();
     virtual void checkBounds();
+    virtual void setColor(ofColor color);
+    virtual void setColor(float r, float g, float b);
     
     ofColor playerColor;
+    ofColor cursorColor;
 };
 
 
